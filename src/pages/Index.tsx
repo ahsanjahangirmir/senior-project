@@ -1,13 +1,37 @@
-// Update this page (the content is just a fallback if you fail to update the page)
 
-const Index = () => {
+import React from 'react';
+import { PCDProvider } from '@/context/PCDContext';
+import Gallery from '@/components/Gallery';
+import ChatInterface from '@/components/ChatInterface';
+
+const Index: React.FC = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <PCDProvider>
+      <div className="h-screen w-screen flex flex-col overflow-hidden">
+        {/* Header */}
+        <header className="p-4 border-b border-border glass">
+          <div className="container mx-auto flex items-center justify-between">
+            <h1 className="text-xl font-medium">PCD Chat Assistant</h1>
+            <div className="text-sm text-muted-foreground">
+              Point Cloud Analysis System
+            </div>
+          </div>
+        </header>
+        
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          {/* Gallery Section */}
+          <div className="md:w-1/3 lg:w-1/4 border-r border-border h-full">
+            <Gallery />
+          </div>
+          
+          {/* Chat Interface Section */}
+          <div className="flex-1 h-full">
+            <ChatInterface />
+          </div>
+        </main>
       </div>
-    </div>
+    </PCDProvider>
   );
 };
 
