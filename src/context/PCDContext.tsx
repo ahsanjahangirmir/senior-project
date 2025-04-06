@@ -215,25 +215,37 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ]
       };
       
-      // Call the LLM API
-      const completion = await openai.chat.completions.create({
+      // Call the LLM API with streaming enabled
+      const stream = await openai.chat.completions.create({
         model: "meta-llama/llama-4-maverick:free",
         messages: [systemMessage, userPromptMessage],
+        stream: true,
       });
 
-      // Get the response
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: MessageRole.ASSISTANT,
-        content: completion.choices[0].message.content || "I couldn't analyze this scene properly.",
-        timestamp: Date.now(),
-      };
-      
+      // Create a new assistant message placeholder for streaming tokens
+      let streamingContent = "";
+      const streamingMessageId = `assistant-${Date.now()}`;
       setChatSession(prev => ({
         ...prev,
-        // Replace loading message with real message
-        messages: prev.messages.filter(msg => !msg.isLoading).concat(assistantMessage),
+        messages: prev.messages.filter(msg => !msg.isLoading).concat({
+          id: streamingMessageId,
+          role: MessageRole.ASSISTANT,
+          content: "",
+          timestamp: Date.now(),
+        }),
       }));
+
+      // Process tokens as they arrive
+      for await (const chunk of stream) {
+        const token = chunk.choices[0].delta?.content || "";
+        streamingContent += token;
+        setChatSession(prev => ({
+          ...prev,
+          messages: prev.messages.map(msg =>
+            msg.id === streamingMessageId ? { ...msg, content: streamingContent } : msg
+          ),
+        }));
+      }
     } catch (error) {
       console.error("Error calling LLM:", error);
       
