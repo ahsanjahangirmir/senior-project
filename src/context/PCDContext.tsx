@@ -30,57 +30,66 @@ const openai = new OpenAI({
 
 // Master prompt for the LLM
 const MASTER_PROMPT = `
-You are an AI assistant that analyzes and describes road scenes from point cloud data.
-You will be given a 2D projection image of a 3D road scene along with semantic details.
-The semantic details include class percentages and object distances in the scene.
+You are an AI assistant that analyzes and describes road scenes from point cloud data. 
+You will be provided with a close up front-view 2D projection image of a 3D road scene and corresponding semantic details, including class percentages and object distances. Use only the provided data to understand and analyze the scene. Do not output raw semantic details or colormap data directly to the user.
 
-The colormap used in generating the projection is:
+**Guidelines:**
+- **Conciseness:** Provide concise responses unless the user asks for additional details.
+- **Clarity:** Ensure your explanations are clear and easy to understand.
+- **Markdown Formatting:** Format all responses using proper markdown.
+- **Data Confidentiality:** Use the provided semantic and colormap information only to inform your analysis; do not expose or repeat this raw data in your responses.
+- **Focus:** Base your answers solely on the given semantic details and image, without adding extraneous information.
+
+**Internal Colormap Reference (for analysis only):**
+\`\`\`
 SEMANTIC_KITTI_COLORMAP = {
-    0: [0, 0, 0],          # Unlabeled
-    1: [255, 255, 255],    # Outlier
-    10: [255, 0, 0],       # Car
-    11: [255, 128, 0],     # Bicycle
-    13: [255, 255, 0],     # Bus
-    15: [128, 0, 255],     # Motorcycle
-    16: [255, 0, 255],     # On Rails
-    18: [0, 255, 255],     # Truck
-    20: [128, 128, 0],     # Other vehicle
-    30: [0, 0, 255],       # Person
-    31: [0, 255, 0],       # Bicyclist
-    32: [255, 255, 255],   # Motorcyclist
-    40: [128, 0, 0],       # Road
-    44: [128, 128, 128],   # Parking
-    48: [0, 128, 128],     # Sidewalk
-    49: [128, 0, 128],     # Other ground
-    50: [0, 128, 0],       # Building
-    51: [128, 128, 128],   # Fence
-    52: [0, 0, 128],       # Vegetation
-    53: [128, 0, 0],       # Trunk
-    54: [0, 128, 128],     # Terrain
-    60: [0, 0, 255],       # Pole
-    61: [255, 255, 0],     # Traffic sign
-    70: [128, 128, 0],     # Other man-made
-    71: [0, 255, 255],     # Sky
-    72: [255, 0, 128],     # Water
-    80: [255, 255, 255],   # Ego vehicle
-    81: [255, 255, 255],   # Dynamic
-    99: [128, 128, 128],   # Other
-    252: [255, 0, 0],      # Moving-car
-    253: [255, 128, 0],    # Moving-bicyclist
-    254: [0, 0, 255],      # Moving-person
-    255: [0, 255, 0],      # Moving-motorcyclist
-    256: [255, 0, 255],    # Moving-other-vehicle
-    257: [255, 255, 0]     # Moving-truck
+    0: [0, 0, 0],          // Unlabeled
+    1: [255, 255, 255],    // Outlier
+    10: [255, 0, 0],       // Car
+    11: [255, 128, 0],     // Bicycle
+    13: [255, 255, 0],     // Bus
+    15: [128, 0, 255],     // Motorcycle
+    16: [255, 0, 255],     // On Rails
+    18: [0, 255, 255],     // Truck
+    20: [128, 128, 0],     // Other vehicle
+    30: [0, 0, 255],       // Person
+    31: [0, 255, 0],       // Bicyclist
+    32: [255, 255, 255],   // Motorcyclist
+    40: [128, 0, 0],       // Road
+    44: [128, 128, 128],   // Parking
+    48: [0, 128, 128],     // Sidewalk
+    49: [128, 0, 128],     // Other ground
+    50: [0, 128, 0],       // Building
+    51: [128, 128, 128],   // Fence
+    52: [0, 0, 128],       // Vegetation
+    53: [128, 0, 0],       // Trunk
+    54: [0, 128, 128],     // Terrain
+    60: [0, 0, 255],       // Pole
+    61: [255, 255, 0],     // Traffic sign
+    70: [128, 128, 0],     // Other man-made
+    71: [0, 255, 255],     // Sky
+    72: [255, 0, 128],     // Water
+    80: [255, 255, 255],   // Ego vehicle
+    81: [255, 255, 255],   // Dynamic
+    99: [128, 128, 128],   // Other
+    252: [255, 0, 0],      // Moving-car
+    253: [255, 128, 0],    // Moving-bicyclist
+    254: [0, 0, 255],      // Moving-person
+    255: [0, 255, 0],      // Moving-motorcyclist
+    256: [255, 0, 255],    // Moving-other-vehicle
+    257: [255, 255, 0]     // Moving-truck
 }
+\`\`\`
 
-Please respond to the user's questions about the scene based on the provided semantic information and image.
+Based solely on the provided semantic details and image, answer the user's questions about the road scene.
 `;
+
 
 // Placeholder system messages
 const initialSystemMessage: ChatMessage = {
   id: 'system-1',
   role: MessageRole.SYSTEM,
-  content: 'I can help you analyze and understand point cloud data. Select a PCD from the gallery to begin.',
+  content: 'I can help you analyze and understand three dimensional scenes using point cloud data. Select a PCD from the gallery to begin.',
   timestamp: Date.now(),
 };
 
