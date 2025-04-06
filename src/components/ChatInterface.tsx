@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { usePCD } from '@/context/PCDContext';
 import ChatMessage from './ChatMessage';
@@ -31,7 +30,8 @@ const ChatInterface: React.FC = () => {
       </div>
       
       {/* Chat section */}
-      <div className="flex-1 flex flex-col">
+      {/* Added `min-h-0` so the flex child can shrink and allow inner scrolling */}
+      <div className="flex-1 flex flex-col min-h-0">
         <div className="chat-messages flex-1 overflow-y-auto p-4">
           {chatSession.messages.map(message => (
             <ChatMessage key={message.id} message={message} />
