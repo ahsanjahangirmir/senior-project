@@ -1,0 +1,135 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCD 3D Viewer</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    #container {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      width: 100%;
+      text-align: center;
+      color: white;
+      z-index: 100;
+      display: block;
+      text-shadow: 1px 1px 2px black;
+    }
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      background-color: rgba(0,0,0,0.7);
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 200;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.133.1/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.133.1/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.133.1/examples/js/loaders/PCDLoader.js"></script>
+</head>
+<body>
+  <div id="info">PCD Viewer - Drag to rotate, scroll to zoom</div>
+  <div id="loading">Loading point cloud...</div>
+  <div id="container"></div>
+
+  <script>
+    // Get PCD path from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const pcdPath = urlParams.get('pcd');
+    
+    if (!pcdPath) {
+      document.getElementById('info').textContent = 'Error: No PCD file specified';
+      document.getElementById('loading').textContent = 'Error: No PCD file specified';
+    } else {
+      // Set up the scene
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x111111);
+      
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 0, 5);
+      
+      const renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.getElementById('container').appendChild(renderer.domElement);
+      
+      // Add lights
+      const ambientLight = new THREE.AmbientLight(0x404040);
+      scene.add(ambientLight);
+      
+      const directionalLight = new THREE.DirectionalLight(0xffffff);
+      directionalLight.position.set(1, 1, 1);
+      scene.add(directionalLight);
+      
+      // Add orbit controls
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.25;
+      
+      // Load the PCD file
+      const loader = new THREE.PCDLoader();
+      loader.load(pcdPath, function(points) {
+        scene.add(points);
+        
+        // Center the camera on the point cloud
+        points.geometry.computeBoundingSphere();
+        const center = points.geometry.boundingSphere.center;
+        const radius = points.geometry.boundingSphere.radius;
+        
+        camera.position.copy(center);
+        camera.position.z += radius * 2;
+        controls.target.copy(center);
+        
+        // Remove loading indicator
+        document.getElementById('loading').style.display = 'none';
+        
+        // Update camera and controls
+        camera.updateProjectionMatrix();
+        controls.update();
+        
+        document.getElementById('info').textContent = 
+          `PCD Viewer - ${pcdPath.split('/').pop()} - Points: ${points.geometry.attributes.position.count}`;
+      }, 
+      function(xhr) {
+        // Progress
+        document.getElementById('loading').textContent = 
+          `Loading: ${Math.round(xhr.loaded / xhr.total * 100)}%`;
+      },
+      function(error) {
+        // Error
+        document.getElementById('loading').textContent = 'Error loading point cloud';
+        console.error('Error loading PCD:', error);
+      });
+      
+      // Handle window resize
+      window.addEventListener('resize', function() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+      
+      // Animation loop
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      animate();
+    }
+  </script>
+</body>
+</html>

@@ -6,7 +6,8 @@ export type PCDItem = {
   thumbnail: string;
   description?: string;
   date?: string;
-  dataUrl?: string; // This would be the actual PCD data URL in production
+  pcdPath?: string;
+  projectionPath?: string;
 };
 
 // Chat message types

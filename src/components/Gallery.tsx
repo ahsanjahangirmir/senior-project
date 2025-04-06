@@ -38,18 +38,15 @@ interface GalleryItemProps {
 const GalleryItem: React.FC<GalleryItemProps> = ({ pcd, isActive, onSelect, delay }) => {
   return (
     <div 
-      className={`gallery-item animate-fade-in ${isActive ? 'active' : ''}`} 
+      className={`gallery-item cursor-pointer transition-all duration-200 border rounded-lg overflow-hidden ${isActive ? 'ring-2 ring-primary' : 'hover:bg-accent/50'}`} 
       style={{ animationDelay: `${delay * 100}ms` }}
       onClick={onSelect}
     >
       <div className="aspect-video bg-muted/50 relative overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-          <span className="text-xs">Point Cloud Preview</span>
-        </div>
         <img 
-          src={pcd.thumbnail} 
+          src={pcd.projectionPath} 
           alt={pcd.name}
-          className="w-full h-full object-cover opacity-30"
+          className="w-full h-full object-cover"
         />
       </div>
       <div className="p-3 glass">

@@ -32,20 +32,20 @@ const ChatInterface: React.FC = () => {
       
       {/* Chat section */}
       <div className="flex-1 flex flex-col">
-        <div className="chat-messages">
+        <div className="chat-messages flex-1 overflow-y-auto p-4">
           {chatSession.messages.map(message => (
             <ChatMessage key={message.id} message={message} />
           ))}
           <div ref={messagesEndRef} />
         </div>
         
-        <form onSubmit={handleSubmit} className="input-container glass">
+        <form onSubmit={handleSubmit} className="input-container glass p-4 border-t border-border">
           <div className="relative">
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder={selectedPCD ? "Ask about this point cloud..." : "Select a point cloud first"}
+              placeholder={selectedPCD ? "Ask about this point cloud scene..." : "Select a point cloud first"}
               disabled={!selectedPCD || isProcessing}
               className="w-full px-4 py-3 pr-12 rounded-full bg-accent/40 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 transition-all duration-200"
             />
