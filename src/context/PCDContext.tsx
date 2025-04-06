@@ -180,36 +180,35 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       // Prepare the prompt for the LLM
-      const messages = [
-        {
-          role: "system",
-          content: MASTER_PROMPT
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Scene Information:
-              - Class percentages: ${JSON.stringify(pcdStats.details.class_percentages)}
-              - Object distances: ${JSON.stringify(pcdStats.details.distances)}
-              
-              This is the 2D projection of the scene. Please answer the following question about this scene: ${content}`
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: selectedPCD.projectionPath
-              }
+      const systemMessage = {
+        role: "system" as const,
+        content: MASTER_PROMPT
+      };
+      
+      const userPromptMessage = {
+        role: "user" as const,
+        content: [
+          {
+            type: "text" as const,
+            text: `Scene Information:
+            - Class percentages: ${JSON.stringify(pcdStats.details.class_percentages)}
+            - Object distances: ${JSON.stringify(pcdStats.details.distances)}
+            
+            This is the 2D projection of the scene. Please answer the following question about this scene: ${content}`
+          },
+          {
+            type: "image_url" as const,
+            image_url: {
+              url: selectedPCD.projectionPath
             }
-          ]
-        }
-      ];
+          }
+        ]
+      };
       
       // Call the LLM API
       const completion = await openai.chat.completions.create({
         model: "meta-llama/llama-4-maverick:free",
-        messages: messages,
+        messages: [systemMessage, userPromptMessage],
       });
 
       // Get the response
