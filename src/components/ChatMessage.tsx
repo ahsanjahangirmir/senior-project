@@ -1,5 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 import { ChatMessage as ChatMessageType, MessageRole } from '@/lib/types';
 
 interface ChatMessageProps {
@@ -43,7 +45,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         <span className="text-xs font-medium">{isUser ? 'You' : 'AI'}</span>
       </div>
       <div className={isUser ? "message-bubble-user" : "message-bubble-assistant"}>
-        <ReactMarkdown>{message.content}</ReactMarkdown>
+        <div className="prose">
+          <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>
+            {message.content}
+          </ReactMarkdown>
+        </div>
       </div>
     </div>
   );
