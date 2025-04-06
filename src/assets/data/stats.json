@@ -1,0 +1,261 @@
+[
+    {
+        "scene_no": "000000",
+        "details": {
+            "class_percentages": {
+                "Car": 1.46,
+                "Person": 0.06,
+                "Bicyclist": 0.0,
+                "Road": 16.48,
+                "Parking": 0.48,
+                "Sidewalk": 24.29,
+                "Other ground": 0.01,
+                "Building": 1.12,
+                "Fence": 1.48,
+                "Other man-made": 22.23,
+                "Sky": 5.09,
+                "Water": 24.84,
+                "Ego vehicle": 1.17,
+                "Dynamic": 1.28
+            },
+            "distances": {
+                "Car": 1.7,
+                "Person": 22.26,
+                "Bicyclist": 2.34
+            },
+            "projection_path": "./projections/000000_projection.png"
+        }
+    },
+    {
+        "scene_no": "000001",
+        "details": {
+            "class_percentages": {
+                "Car": 1.66,
+                "Person": 0.07,
+                "Bicyclist": 0.0,
+                "Road": 16.88,
+                "Parking": 0.66,
+                "Sidewalk": 25.66,
+                "Other ground": 0.01,
+                "Building": 1.32,
+                "Fence": 1.44,
+                "Other man-made": 21.84,
+                "Sky": 5.89,
+                "Water": 22.81,
+                "Ego vehicle": 1.27,
+                "Dynamic": 0.5
+            },
+            "distances": {
+                "Car": 1.63,
+                "Person": 21.89,
+                "Bicyclist": 2.36
+            },
+            "projection_path": "./projections/000001_projection.png"
+        }
+    },
+    {
+        "scene_no": "000002",
+        "details": {
+            "class_percentages": {
+                "Car": 1.63,
+                "Person": 0.07,
+                "Road": 17.3,
+                "Parking": 0.68,
+                "Sidewalk": 27.04,
+                "Other ground": 0.0,
+                "Building": 1.48,
+                "Fence": 1.62,
+                "Other man-made": 21.22,
+                "Sky": 5.04,
+                "Water": 21.78,
+                "Ego vehicle": 1.62,
+                "Dynamic": 0.52
+            },
+            "distances": {
+                "Car": 1.46,
+                "Person": 21.57
+            },
+            "projection_path": "./projections/000002_projection.png"
+        }
+    },
+    {
+        "scene_no": "000003",
+        "details": {
+            "class_percentages": {
+                "Car": 1.75,
+                "Person": 0.08,
+                "Road": 17.94,
+                "Parking": 0.57,
+                "Sidewalk": 27.95,
+                "Other ground": 0.0,
+                "Building": 1.56,
+                "Fence": 1.41,
+                "Other man-made": 20.12,
+                "Sky": 5.33,
+                "Water": 20.56,
+                "Ego vehicle": 2.2,
+                "Dynamic": 0.53
+            },
+            "distances": {
+                "Car": 1.46,
+                "Person": 21.26
+            },
+            "projection_path": "./projections/000003_projection.png"
+        }
+    },
+    {
+        "scene_no": "000004",
+        "details": {
+            "class_percentages": {
+                "Car": 1.74,
+                "Person": 0.08,
+                "Road": 18.38,
+                "Parking": 0.87,
+                "Sidewalk": 28.26,
+                "Building": 1.74,
+                "Fence": 2.05,
+                "Other man-made": 19.6,
+                "Sky": 5.02,
+                "Water": 19.65,
+                "Ego vehicle": 2.06,
+                "Dynamic": 0.54
+            },
+            "distances": {
+                "Car": 1.47,
+                "Person": 20.86
+            },
+            "projection_path": "./projections/000004_projection.png"
+        }
+    },
+    {
+        "scene_no": "000005",
+        "details": {
+            "class_percentages": {
+                "Car": 1.9,
+                "Person": 0.07,
+                "Road": 19.05,
+                "Parking": 0.72,
+                "Sidewalk": 28.38,
+                "Other ground": 0.01,
+                "Building": 1.95,
+                "Fence": 1.75,
+                "Other man-made": 18.98,
+                "Sky": 5.07,
+                "Water": 19.56,
+                "Ego vehicle": 2.06,
+                "Dynamic": 0.5
+            },
+            "distances": {
+                "Car": 1.49,
+                "Person": 20.52
+            },
+            "projection_path": "./projections/000005_projection.png"
+        }
+    },
+    {
+        "scene_no": "000006",
+        "details": {
+            "class_percentages": {
+                "Car": 2.03,
+                "Person": 0.25,
+                "Road": 19.57,
+                "Parking": 0.66,
+                "Sidewalk": 28.29,
+                "Other ground": 0.0,
+                "Building": 2.11,
+                "Fence": 1.92,
+                "Other man-made": 19.3,
+                "Sky": 4.92,
+                "Water": 18.42,
+                "Ego vehicle": 2.04,
+                "Dynamic": 0.48
+            },
+            "distances": {
+                "Car": 1.48,
+                "Person": 3.96
+            },
+            "projection_path": "./projections/000006_projection.png"
+        }
+    },
+    {
+        "scene_no": "000007",
+        "details": {
+            "class_percentages": {
+                "Car": 2.23,
+                "Bicycle": 0.0,
+                "Person": 0.25,
+                "Road": 20.37,
+                "Parking": 0.34,
+                "Sidewalk": 28.43,
+                "Other ground": 0.01,
+                "Building": 2.28,
+                "Fence": 1.72,
+                "Other man-made": 19.14,
+                "Sky": 4.82,
+                "Water": 17.4,
+                "Ego vehicle": 2.22,
+                "Dynamic": 0.8
+            },
+            "distances": {
+                "Car": 1.51,
+                "Bicycle": 49.59,
+                "Person": 3.58
+            },
+            "projection_path": "./projections/000007_projection.png"
+        }
+    },
+    {
+        "scene_no": "000008",
+        "details": {
+            "class_percentages": {
+                "Car": 2.42,
+                "Bicycle": 0.0,
+                "Other vehicle": 0.27,
+                "Person": 0.14,
+                "Road": 21.03,
+                "Parking": 0.78,
+                "Sidewalk": 27.74,
+                "Other ground": 0.05,
+                "Building": 2.13,
+                "Fence": 1.16,
+                "Other man-made": 19.79,
+                "Sky": 4.37,
+                "Water": 17.09,
+                "Ego vehicle": 2.16,
+                "Dynamic": 0.85
+            },
+            "distances": {
+                "Car": 1.5,
+                "Bicycle": 48.32,
+                "Other vehicle": 18.28,
+                "Person": 19.75
+            },
+            "projection_path": "./projections/000008_projection.png"
+        }
+    },
+    {
+        "scene_no": "000009",
+        "details": {
+            "class_percentages": {
+                "Car": 2.44,
+                "Person": 0.16,
+                "Road": 21.88,
+                "Parking": 0.85,
+                "Sidewalk": 26.94,
+                "Other ground": 0.01,
+                "Building": 2.29,
+                "Fence": 1.63,
+                "Other man-made": 19.62,
+                "Sky": 4.69,
+                "Water": 16.43,
+                "Ego vehicle": 2.24,
+                "Dynamic": 0.83
+            },
+            "distances": {
+                "Car": 1.52,
+                "Person": 3.4
+            },
+            "projection_path": "./projections/000009_projection.png"
+        }
+    }
+]
