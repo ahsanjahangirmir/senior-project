@@ -13,14 +13,15 @@ const realPCDs: PCDItem[] = statsData.map((item) => {
     description: `Point cloud capture with various objects and scene elements`,
     date: new Date().toISOString().split('T')[0],
     projectionPath: `/src/assets/data/projections/${item.scene_no}_projection.png`,
-    pcdPath: `/src/assets/data/pcds/${item.scene_no}.bin`
+    pcdPath: `/src/assets/data/pcds/${item.scene_no}.pcd`
   };
 });
 
 // Initialize OpenAI client for OpenRouter
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
-  apiKey: "<OPENROUTER_API_KEY>",
+  apiKey: import.meta.env.VITE_OPENROUTER_API_KEY,
+  dangerouslyAllowBrowser: true,
   defaultHeaders: {
     "HTTP-Referer": window.location.href,
     "X-Title": "PCD Chat Assistant",
