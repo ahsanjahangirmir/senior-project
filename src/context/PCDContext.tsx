@@ -147,125 +147,168 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.open(viewerUrl, '_blank');
   };
 
-  // Send a new message to the LLM
-  const sendMessage = async (content: string) => {
-    if (!content.trim() || !selectedPCD) return;
-    
-    // Add user message
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: MessageRole.USER,
-      content,
-      timestamp: Date.now(),
-    };
-    
-    setChatSession(prev => ({
-      ...prev,
-      messages: [...prev.messages, userMessage],
-    }));
-    
-    // Set processing state
-    setIsProcessing(true);
-    
-    // Add a loading message
-    const loadingMessage: ChatMessage = {
-      id: `assistant-loading-${Date.now()}`,
-      role: MessageRole.ASSISTANT,
-      content: '',
-      timestamp: Date.now(),
-      isLoading: true,
-    };
-    
-    setChatSession(prev => ({
-      ...prev,
-      messages: [...prev.messages, loadingMessage],
-    }));
-    
-    try {
-      // Get the PCD stats
-      const pcdStats = statsData.find(item => item.scene_no === selectedPCD.id);
-      
-      if (!pcdStats) {
-        throw new Error(`Stats not found for PCD: ${selectedPCD.id}`);
-      }
-      
-      // Prepare the prompt for the LLM
-      const systemMessage = {
-        role: "system" as const,
-        content: MASTER_PROMPT
-      };
-      
-      const userPromptMessage = {
-        role: "user" as const,
-        content: [
-          {
-            type: "text" as const,
-            text: `Scene Information:
-            - Class percentages: ${JSON.stringify(pcdStats.details.class_percentages)}
-            - Object distances: ${JSON.stringify(pcdStats.details.distances)}
-            
-            This is the 2D projection of the scene. Please answer the following question about this scene: ${content}`
-          },
-          {
-            type: "image_url" as const,
-            image_url: {
-              url: selectedPCD.projectionPath
-            }
-          }
-        ]
-      };
-      
-      // Call the LLM API with streaming enabled
-      const stream = await openai.chat.completions.create({
-        model: "meta-llama/llama-4-maverick:free",
-        messages: [systemMessage, userPromptMessage],
-        stream: true,
-      });
+// Send a new message to the LLM using fetch
+const sendMessage = async (content: string) => {
+  if (!content.trim() || !selectedPCD) return;
 
-      // Create a new assistant message placeholder for streaming tokens
-      let streamingContent = "";
-      const streamingMessageId = `assistant-${Date.now()}`;
-      setChatSession(prev => ({
-        ...prev,
-        messages: prev.messages.filter(msg => !msg.isLoading).concat({
-          id: streamingMessageId,
-          role: MessageRole.ASSISTANT,
-          content: "",
-          timestamp: Date.now(),
-        }),
-      }));
-
-      // Process tokens as they arrive
-      for await (const chunk of stream) {
-        const token = chunk.choices[0].delta?.content || "";
-        streamingContent += token;
-        setChatSession(prev => ({
-          ...prev,
-          messages: prev.messages.map(msg =>
-            msg.id === streamingMessageId ? { ...msg, content: streamingContent } : msg
-          ),
-        }));
-      }
-    } catch (error) {
-      console.error("Error calling LLM:", error);
-      
-      // Handle error
-      const errorMessage: ChatMessage = {
-        id: `assistant-error-${Date.now()}`,
-        role: MessageRole.ASSISTANT,
-        content: "I'm having trouble analyzing this scene right now. Please try again later.",
-        timestamp: Date.now(),
-      };
-      
-      setChatSession(prev => ({
-        ...prev,
-        // Replace loading message with error message
-        messages: prev.messages.filter(msg => !msg.isLoading).concat(errorMessage),
-      }));
-    } finally {
-      setIsProcessing(false);
-    }
+  // Add user message
+  const userMessage: ChatMessage = {
+    id: `user-${Date.now()}`,
+    role: MessageRole.USER,
+    content,
+    timestamp: Date.now(),
   };
+
+  setChatSession(prev => ({
+    ...prev,
+    messages: [...prev.messages, userMessage],
+  }));
+
+  // Set processing state
+  setIsProcessing(true);
+
+  // Add a loading message
+  const loadingMessage: ChatMessage = {
+    id: `assistant-loading-${Date.now()}`,
+    role: MessageRole.ASSISTANT,
+    content: '',
+    timestamp: Date.now(),
+    isLoading: true,
+  };
+
+  setChatSession(prev => ({
+    ...prev,
+    messages: [...prev.messages, loadingMessage],
+  }));
+
+  try {
+    // Get the PCD stats
+    const pcdStats = statsData.find(item => item.scene_no === selectedPCD.id);
+
+    if (!pcdStats) {
+      throw new Error(`Stats not found for PCD: ${selectedPCD.id}`);
+    }
+
+    // Prepare the request body
+    const body = {
+      model: "meta-llama/llama-4-maverick:free",
+      messages: [
+        {
+          role: "system",
+          content: MASTER_PROMPT,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Scene Information:
+                - Class percentages: ${JSON.stringify(pcdStats.details.class_percentages)}
+                - Object distances: ${JSON.stringify(pcdStats.details.distances)}
+                
+                This is the 2D projection of the scene. Please answer the following question about this scene: ${content}`,
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: selectedPCD.projectionPath,
+              },
+            },
+          ],
+        },
+      ],
+      stream: true,
+    };
+
+    // Set only the necessary headers
+    const headers = {
+      'Authorization': `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': window.location.href,
+      'X-Title': 'PCD Chat Assistant',
+    };
+
+    // Make the fetch request
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // Create a new assistant message for streaming
+    let streamingContent = "";
+    const streamingMessageId = `assistant-${Date.now()}`;
+    setChatSession(prev => ({
+      ...prev,
+      messages: prev.messages.filter(msg => !msg.isLoading).concat({
+        id: streamingMessageId,
+        role: MessageRole.ASSISTANT,
+        content: "",
+        timestamp: Date.now(),
+      }),
+    }));
+
+    // Handle the streaming response
+    const reader = response.body.getReader();
+    let buffer = '';
+
+    const processChunk = async ({ done, value }: { done: boolean; value?: Uint8Array }) => {
+      if (done) {
+        setIsProcessing(false);
+        return;
+      }
+
+      buffer += new TextDecoder().decode(value);
+
+      let index;
+      while ((index = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, index);
+        buffer = buffer.slice(index + 1);
+
+        if (line.startsWith('data: ')) {
+          const jsonStr = line.slice(6);
+          try {
+            const data = JSON.parse(jsonStr);
+            const token = data.choices[0].delta?.content || "";
+            streamingContent += token;
+            setChatSession(prev => ({
+              ...prev,
+              messages: prev.messages.map(msg =>
+                msg.id === streamingMessageId ? { ...msg, content: streamingContent } : msg
+              ),
+            }));
+          } catch (e) {
+            console.error('Error parsing JSON:', e);
+          }
+        }
+      }
+
+      reader.read().then(processChunk);
+    };
+
+    reader.read().then(processChunk);
+  } catch (error) {
+    console.error("Error calling LLM:", error);
+
+    const errorMessage: ChatMessage = {
+      id: `assistant-error-${Date.now()}`,
+      role: MessageRole.ASSISTANT,
+      content: "I'm having trouble analyzing this scene right now. Please try again later.",
+      timestamp: Date.now(),
+    };
+
+    setChatSession(prev => ({
+      ...prev,
+      messages: prev.messages.filter(msg => !msg.isLoading).concat(errorMessage),
+    }));
+  } finally {
+    setIsProcessing(false);
+  }
+};
 
   return (
     <PCDContext.Provider value={{ 
