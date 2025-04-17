@@ -1,3 +1,4 @@
+
 // Sequence data types
 export type SequenceFrameSummary = {
   class_percentages: Record<string, number>;

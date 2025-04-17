@@ -1,6 +1,8 @@
+
 import React, { createContext, useContext, useState } from 'react';
 import { DrivingSequence, ChatMessage, MessageRole, ChatSession, SequenceSummary, SequenceFrameSummary } from '@/lib/types';
 import OpenAI from 'openai';
+import { toast } from 'sonner';
 
 // Create array of sequence IDs (excluding 08)
 const sequenceIds = ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10'];
@@ -20,7 +22,7 @@ const realSequences: DrivingSequence[] = sequenceIds.map((id) => ({
 // Initialize OpenAI client for OpenRouter
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
-  apiKey: import.meta.env.VITE_OPENROUTER_API_KEY,
+  apiKey: import.meta.env.VITE_OPENROUTER_API_KEY || "OPENROUTER_API_KEY",
   dangerouslyAllowBrowser: true,
   defaultHeaders: {
     "HTTP-Referer": window.location.href,
@@ -130,29 +132,45 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         timestamp: Date.now(),
       };
       
-      // Reset chat session with the welcome message
+      // Reset chat session with the welcome message but don't include the master prompt in the visible messages
       setChatSession({
         id: `session-${Date.now()}`,
-        messages: [
-          {
-            id: 'system-1',
-            role: MessageRole.SYSTEM,
-            content: MASTER_PROMPT,
-            timestamp: Date.now(),
-          },
-          welcomeMessage
-        ],
+        messages: [welcomeMessage],
         sequence,
       });
     } catch (error) {
       console.error('Error loading sequence data:', error);
+      toast.error('Failed to load sequence data');
     }
   };
 
   // Open video viewer in a new tab
   const openVideoViewer = (sequence: DrivingSequence) => {
     if (sequence.videoPath) {
-      window.open(sequence.videoPath, '_blank');
+      // Open in new tab with proper HTML5 video player
+      const videoURL = sequence.videoPath;
+      const videoWindow = window.open('', '_blank');
+      if (videoWindow) {
+        videoWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Driving Sequence ${sequence.id} - Video</title>
+            <style>
+              body { margin: 0; background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; }
+              video { max-width: 100%; max-height: 100vh; }
+            </style>
+          </head>
+          <body>
+            <video controls autoplay>
+              <source src="${videoURL}" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          </body>
+          </html>
+        `);
+        videoWindow.document.close();
+      }
     }
   };
 
@@ -195,44 +213,35 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const frameSummaries = await fetch(selectedSequence.frameSummariesPath).then(res => res.json());
       const sequenceSummary = await fetch(selectedSequence.sequenceSummaryPath).then(res => res.json());
 
-      // Prepare the request body
-      const body = {
-        model: "meta-llama/llama-4-maverick:free",
-        messages: [
-          {
-            role: "system",
-            content: MASTER_PROMPT,
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `Sequence Information:
-                  - Frame Summaries: ${JSON.stringify(frameSummaries)}
-                  - Sequence Summary: ${JSON.stringify(sequenceSummary)}
-                  
-                  Please answer the following question about this driving sequence: ${content}`,
-              },
-            ],
-          },
-        ],
-        stream: true,
+      // Set appropriate types for the message parameters to match OpenAI API requirements
+      const systemMessage = { 
+        role: "system" as const, 
+        content: MASTER_PROMPT 
+      };
+      
+      const userContentMessage = { 
+        role: "user" as const,
+        content: `Sequence Information:
+          - Frame Summaries: ${JSON.stringify(frameSummaries)}
+          - Sequence Summary: ${JSON.stringify(sequenceSummary)}
+          
+          Please answer the following question about this driving sequence: ${content}`
       };
 
-      // Set only the necessary headers
-      const headers = {
-        'Authorization': `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.href,
-        'X-Title': 'PCD Chat Assistant',
-      };
-
-      // Make the fetch request
+      // Use fetch directly for streaming to have better control
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
-        headers,
-        body: JSON.stringify(body),
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY || "OPENROUTER_API_KEY"}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': window.location.href,
+          'X-Title': 'PCD Chat Assistant',
+        },
+        body: JSON.stringify({
+          model: "meta-llama/llama-4-maverick:free",
+          messages: [systemMessage, userContentMessage],
+          stream: true,
+        }),
       });
 
       if (!response.ok) {
@@ -253,7 +262,7 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
 
       // Handle the streaming response
-      const reader = response.body.getReader();
+      const reader = response.body!.getReader();
       let buffer = '';
 
       const processChunk = async ({ done, value }: { done: boolean; value?: Uint8Array }) => {
@@ -262,35 +271,52 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return;
         }
 
-        buffer += new TextDecoder().decode(value);
+        if (value) {  // Check if value is defined before decoding
+          buffer += new TextDecoder().decode(value);
 
-        let index;
-        while ((index = buffer.indexOf('\n')) !== -1) {
-          const line = buffer.slice(0, index);
-          buffer = buffer.slice(index + 1);
+          let index;
+          while ((index = buffer.indexOf('\n')) !== -1) {
+            const line = buffer.slice(0, index);
+            buffer = buffer.slice(index + 1);
 
-          if (line.startsWith('data: ')) {
-            const jsonStr = line.slice(6);
-            try {
-              const data = JSON.parse(jsonStr);
-              const token = data.choices[0].delta?.content || "";
-              streamingContent += token;
-              setChatSession(prev => ({
-                ...prev,
-                messages: prev.messages.map(msg =>
-                  msg.id === streamingMessageId ? { ...msg, content: streamingContent } : msg
-                ),
-              }));
-            } catch (e) {
-              console.error('Error parsing JSON:', e);
+            if (line.startsWith('data: ')) {
+              // For "[DONE]" message
+              if (line === 'data: [DONE]') {
+                setIsProcessing(false);
+                return;
+              }
+
+              const jsonStr = line.slice(6);
+              try {
+                const data = JSON.parse(jsonStr);
+                if (data?.choices && data.choices[0]?.delta?.content) {
+                  const token = data.choices[0].delta.content;
+                  streamingContent += token;
+                  setChatSession(prev => ({
+                    ...prev,
+                    messages: prev.messages.map(msg =>
+                      msg.id === streamingMessageId ? { ...msg, content: streamingContent } : msg
+                    ),
+                  }));
+                }
+              } catch (e) {
+                console.error('Error parsing JSON:', e);
+              }
             }
           }
         }
 
-        reader.read().then(processChunk);
+        // Continue reading
+        reader.read().then(processChunk).catch(err => {
+          console.error("Error in stream processing:", err);
+          setIsProcessing(false);
+        });
       };
 
-      reader.read().then(processChunk);
+      reader.read().then(processChunk).catch(err => {
+        console.error("Error in initial read:", err);
+        setIsProcessing(false);
+      });
     } catch (error) {
       console.error("Error calling LLM:", error);
 
@@ -305,7 +331,7 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...prev,
         messages: prev.messages.filter(msg => !msg.isLoading).concat(errorMessage),
       }));
-    } finally {
+      
       setIsProcessing(false);
     }
   };

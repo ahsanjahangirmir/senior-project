@@ -1,21 +1,21 @@
 
 import React from 'react';
-import { PCDItem } from '@/lib/types';
-import { ArrowUp } from 'lucide-react';
+import { DrivingSequence } from '@/lib/types';
+import { ArrowUp, Play } from 'lucide-react';
 import { usePCD } from '@/context/PCDContext';
 
 interface PointCloudViewerProps {
-  pcd: PCDItem | null;
+  sequence: DrivingSequence | null;
 }
 
-const PointCloudViewer: React.FC<PointCloudViewerProps> = ({ pcd }) => {
-  const { openPCDViewer } = usePCD();
+const PointCloudViewer: React.FC<PointCloudViewerProps> = ({ sequence }) => {
+  const { openVideoViewer } = usePCD();
   
-  if (!pcd) {
+  if (!sequence) {
     return (
       <div className="pcd-viewer h-full relative flex items-center justify-center">
         <div className="text-center text-muted-foreground">
-          <p>Select a point cloud from the gallery</p>
+          <p>Select a driving sequence from the gallery</p>
         </div>
       </div>
     );
@@ -25,8 +25,8 @@ const PointCloudViewer: React.FC<PointCloudViewerProps> = ({ pcd }) => {
     <div className="pcd-viewer h-full relative">
       <div className="absolute inset-0">
         <img 
-          src={pcd.projectionPath}
-          alt={`Projection of ${pcd.name}`}
+          src={sequence.thumbnail}
+          alt={`Thumbnail of ${sequence.name}`}
           className="w-full h-full object-contain"
         />
       </div>
@@ -34,15 +34,15 @@ const PointCloudViewer: React.FC<PointCloudViewerProps> = ({ pcd }) => {
       <div className="absolute bottom-0 left-0 right-0 p-3 glass">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium">{pcd.name}</h3>
-            <p className="text-xs text-muted-foreground mt-1">{pcd.description}</p>
+            <h3 className="text-sm font-medium">{sequence.name}</h3>
+            <p className="text-xs text-muted-foreground mt-1">{sequence.description || "Driving sequence"}</p>
           </div>
           <button 
-            onClick={() => openPCDViewer(pcd)}
+            onClick={() => sequence && openVideoViewer(sequence)}
             className="bg-primary text-primary-foreground px-3 py-1 text-xs rounded-full flex items-center"
           >
-            <ArrowUp size={12} className="mr-1" />
-            View 3D
+            <Play size={12} className="mr-1" />
+            View Video
           </button>
         </div>
       </div>
