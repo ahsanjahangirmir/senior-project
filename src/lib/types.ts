@@ -12,12 +12,22 @@ export type SequenceFrameSummary = {
 };
 
 export type SequenceSummary = {
-  max_speed: number;
+  total_frames: number;
+  total_duration: number;
+  total_distance: number;
+  average_speed: number;
   min_speed: number;
-  class_presence_timeline: Record<string, number[]>;
-  // Add other fields as needed
+  max_speed: number;
+  average_speed_from_frames: number;
+  average_class_percentages: Record<string, number>;
+  total_unique_classes: string[];
+  time_series: Array<{
+    timestamp: number;
+    class_percentages: Record<string, number>;
+    car_count: number;
+    person_count: number;
+  }>;
 };
-
 // Convert PCD to Sequence
 export type DrivingSequence = {
   id: string;
