@@ -1,21 +1,21 @@
-
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { PCDItem, ChatMessage, MessageRole, ChatSession } from '@/lib/types';
-import statsData from '@/assets/data/stats.json';
+import React, { createContext, useContext, useState } from 'react';
+import { DrivingSequence, ChatMessage, MessageRole, ChatSession, SequenceSummary, SequenceFrameSummary } from '@/lib/types';
 import OpenAI from 'openai';
 
-// Create real PCD items from stats data
-const realPCDs: PCDItem[] = statsData.map((item) => {
-  return {
-    id: item.scene_no,
-    name: `PCD #${item.scene_no}`,
-    thumbnail: `/src/assets/data/projections/${item.scene_no}_projection.png`,
-    description: `Point cloud capture with various objects and scene elements`,
-    date: new Date().toISOString().split('T')[0],
-    projectionPath: `/src/assets/data/projections/${item.scene_no}_projection.png`,
-    pcdPath: `/src/assets/data/pcds/${item.scene_no}.pcd`
-  };
-});
+// Create array of sequence IDs (excluding 08)
+const sequenceIds = ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10'];
+
+// Create real sequences from available data
+const realSequences: DrivingSequence[] = sequenceIds.map((id) => ({
+  id,
+  name: `Driving Sequence #${id}`,
+  thumbnail: `/src/assets/data/seq/${id}/thumbnail.png`,
+  description: `Driving sequence capture with various road elements`,
+  date: new Date().toISOString().split('T')[0],
+  videoPath: `/src/assets/data/videos/${id}/${id}.mp4`,
+  frameSummariesPath: `/src/assets/data/seq/${id}/frame_summaries.json`,
+  sequenceSummaryPath: `/src/assets/data/seq/${id}/sequence_summary.json`,
+}));
 
 // Initialize OpenAI client for OpenRouter
 const openai = new OpenAI({
@@ -30,17 +30,17 @@ const openai = new OpenAI({
 
 // Master prompt for the LLM
 const MASTER_PROMPT = `
-You are an AI assistant that analyzes and describes road scenes from point cloud data. 
-You will be provided with a close up front-view 2D projection image of a 3D road scene and corresponding semantic details, including class percentages and object distances. Use only the provided data to understand and analyze the scene. Do not output raw semantic details or colormap data directly to the user.
+You are an AI assistant that analyzes and describes road scenes from driving sequence data. 
+You will be provided with sequence summaries and frame-by-frame data, including class percentages, ego vehicle motion, and semantic details. Use this data to understand and analyze the driving scenes thoroughly.
 
 **Guidelines:**
-- **Conciseness:** Provide concise responses unless the user asks for additional details.
-- **Clarity:** Ensure your explanations are clear and easy to understand.
-- **Markdown Formatting:** Format all responses using proper markdown that can be understood by react-markdown.
-- **Data Confidentiality:** Use the provided semantic and colormap information only to inform your analysis; do not expose or repeat this raw data in your responses.
-- **Focus:** Base your answers solely on the given semantic details and image, without adding extraneous information.
+- Use the provided sequence data to inform your analysis but don't quote raw values unless specifically asked
+- Provide user-friendly, natural responses that explain the scene context
+- Focus on relevant details that help users understand the driving scenario
+- Format responses using proper markdown for react-markdown rendering
+- Keep responses concise unless asked for more detail
 
-**Internal Colormap Reference (for analysis only):**
+**Internal Reference (for analysis only):**
 \`\`\`
 SEMANTIC_KITTI_COLORMAP = {
     0: [0, 0, 0],          // Unlabeled
@@ -80,28 +80,17 @@ SEMANTIC_KITTI_COLORMAP = {
     257: [255, 255, 0]     // Moving-truck
 }
 \`\`\`
-
-Based solely on the provided semantic details and image, answer the user's questions about the road scene. Again, it is VERY IMPORTANT that your responses are formatted in markdown so that react-markdown can easily understand the formatting. 
 `;
-
-
-// Placeholder system messages
-const initialSystemMessage: ChatMessage = {
-  id: 'system-1',
-  role: MessageRole.SYSTEM,
-  content: 'I can help you analyze and understand three dimensional scenes using point cloud data. Select a PCD from the gallery to begin.',
-  timestamp: Date.now(),
-};
 
 // Types for the context
 type PCDContextType = {
-  pcds: PCDItem[];
-  selectedPCD: PCDItem | null;
-  selectPCD: (pcd: PCDItem) => void;
+  sequences: DrivingSequence[];
+  selectedSequence: DrivingSequence | null;
+  selectSequence: (sequence: DrivingSequence) => void;
   chatSession: ChatSession;
   sendMessage: (content: string) => void;
   isProcessing: boolean;
-  openPCDViewer: (pcd: PCDItem) => void;
+  openVideoViewer: (sequence: DrivingSequence) => void;
 };
 
 // Create the context
@@ -109,216 +98,227 @@ const PCDContext = createContext<PCDContextType | undefined>(undefined);
 
 // Provider component
 export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [pcds] = useState<PCDItem[]>(realPCDs);
-  const [selectedPCD, setSelectedPCD] = useState<PCDItem | null>(null);
+  const [sequences] = useState<DrivingSequence[]>(realSequences);
+  const [selectedSequence, setSelectedSequence] = useState<DrivingSequence | null>(null);
   const [chatSession, setChatSession] = useState<ChatSession>({
     id: 'session-1',
-    messages: [initialSystemMessage],
+    messages: [{
+      id: 'system-1',
+      role: MessageRole.SYSTEM,
+      content: 'I can help you analyze and understand driving sequences. Select a sequence from the gallery to begin.',
+      timestamp: Date.now(),
+    }],
   });
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Select a PCD and initialize a new chat session
-  const selectPCD = (pcd: PCDItem) => {
-    setSelectedPCD(pcd);
+  // Select a sequence and initialize a new chat session
+  const selectSequence = async (sequence: DrivingSequence) => {
+    setSelectedSequence(sequence);
     
-    // Find the stats data for this PCD
-    const pcdStats = statsData.find(item => item.scene_no === pcd.id);
-    
-    // Create a new welcome message specific to the selected PCD
-    const welcomeMessage: ChatMessage = {
-      id: `welcome-${pcd.id}`,
-      role: MessageRole.ASSISTANT,
-      content: `I'm ready to help you analyze the "${pcd.name}" point cloud data. This scene contains various elements including road, sidewalk, and some objects. What would you like to know about this scene?`,
+    try {
+      // Fetch sequence data
+      const [frameSummaries, sequenceSummary] = await Promise.all([
+        fetch(sequence.frameSummariesPath).then(res => res.json()) as Promise<SequenceFrameSummary[]>,
+        fetch(sequence.sequenceSummaryPath).then(res => res.json()) as Promise<SequenceSummary>
+      ]);
+      
+      // Create a welcome message
+      const welcomeMessage: ChatMessage = {
+        id: `welcome-${sequence.id}`,
+        role: MessageRole.ASSISTANT,
+        content: `I'm ready to help you analyze driving sequence "${sequence.name}". This sequence contains detailed frame-by-frame data and motion analysis. What would you like to know about this driving scene?`,
+        timestamp: Date.now(),
+      };
+      
+      // Reset chat session with the welcome message
+      setChatSession({
+        id: `session-${Date.now()}`,
+        messages: [
+          {
+            id: 'system-1',
+            role: MessageRole.SYSTEM,
+            content: MASTER_PROMPT,
+            timestamp: Date.now(),
+          },
+          welcomeMessage
+        ],
+        sequence,
+      });
+    } catch (error) {
+      console.error('Error loading sequence data:', error);
+    }
+  };
+
+  // Open video viewer in a new tab
+  const openVideoViewer = (sequence: DrivingSequence) => {
+    if (sequence.videoPath) {
+      window.open(sequence.videoPath, '_blank');
+    }
+  };
+
+  // Send a new message to the LLM
+  const sendMessage = async (content: string) => {
+    if (!content.trim() || !selectedSequence) return;
+
+    // Add user message
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: MessageRole.USER,
+      content,
       timestamp: Date.now(),
     };
-    
-    // Reset chat session with the welcome message
-    setChatSession({
-      id: `session-${Date.now()}`,
-      messages: [initialSystemMessage, welcomeMessage],
-      pcd,
-    });
-  };
 
-  // Open PCD viewer in a new tab
-  const openPCDViewer = (pcd: PCDItem) => {
-    // Create a URL for the 3D viewer with the PCD path as a parameter
-    const viewerUrl = `/viewer.html?pcd=${encodeURIComponent(pcd.pcdPath)}`;
-    window.open(viewerUrl, '_blank');
-  };
-
-// Send a new message to the LLM using fetch
-const sendMessage = async (content: string) => {
-  if (!content.trim() || !selectedPCD) return;
-
-  // Add user message
-  const userMessage: ChatMessage = {
-    id: `user-${Date.now()}`,
-    role: MessageRole.USER,
-    content,
-    timestamp: Date.now(),
-  };
-
-  setChatSession(prev => ({
-    ...prev,
-    messages: [...prev.messages, userMessage],
-  }));
-
-  // Set processing state
-  setIsProcessing(true);
-
-  // Add a loading message
-  const loadingMessage: ChatMessage = {
-    id: `assistant-loading-${Date.now()}`,
-    role: MessageRole.ASSISTANT,
-    content: '',
-    timestamp: Date.now(),
-    isLoading: true,
-  };
-
-  setChatSession(prev => ({
-    ...prev,
-    messages: [...prev.messages, loadingMessage],
-  }));
-
-  try {
-    // Get the PCD stats
-    const pcdStats = statsData.find(item => item.scene_no === selectedPCD.id);
-
-    if (!pcdStats) {
-      throw new Error(`Stats not found for PCD: ${selectedPCD.id}`);
-    }
-
-    // Prepare the request body
-    const body = {
-      model: "meta-llama/llama-4-maverick:free",
-      messages: [
-        {
-          role: "system",
-          content: MASTER_PROMPT,
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Scene Information:
-                - Class percentages: ${JSON.stringify(pcdStats.details.class_percentages)}
-                - Object distances: ${JSON.stringify(pcdStats.details.distances)}
-                
-                This is the 2D projection of the scene. Please answer the following question about this scene: ${content}`,
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: selectedPCD.projectionPath,
-              },
-            },
-          ],
-        },
-      ],
-      stream: true,
-    };
-
-    // Set only the necessary headers
-    const headers = {
-      'Authorization': `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': window.location.href,
-      'X-Title': 'PCD Chat Assistant',
-    };
-
-    // Make the fetch request
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    // Create a new assistant message for streaming
-    let streamingContent = "";
-    const streamingMessageId = `assistant-${Date.now()}`;
     setChatSession(prev => ({
       ...prev,
-      messages: prev.messages.filter(msg => !msg.isLoading).concat({
-        id: streamingMessageId,
-        role: MessageRole.ASSISTANT,
-        content: "",
-        timestamp: Date.now(),
-      }),
+      messages: [...prev.messages, userMessage],
     }));
 
-    // Handle the streaming response
-    const reader = response.body.getReader();
-    let buffer = '';
+    // Set processing state
+    setIsProcessing(true);
 
-    const processChunk = async ({ done, value }: { done: boolean; value?: Uint8Array }) => {
-      if (done) {
-        setIsProcessing(false);
-        return;
+    // Add a loading message
+    const loadingMessage: ChatMessage = {
+      id: `assistant-loading-${Date.now()}`,
+      role: MessageRole.ASSISTANT,
+      content: '',
+      timestamp: Date.now(),
+      isLoading: true,
+    };
+
+    setChatSession(prev => ({
+      ...prev,
+      messages: [...prev.messages, loadingMessage],
+    }));
+
+    try {
+      // Get the sequence data
+      const frameSummaries = await fetch(selectedSequence.frameSummariesPath).then(res => res.json());
+      const sequenceSummary = await fetch(selectedSequence.sequenceSummaryPath).then(res => res.json());
+
+      // Prepare the request body
+      const body = {
+        model: "meta-llama/llama-4-maverick:free",
+        messages: [
+          {
+            role: "system",
+            content: MASTER_PROMPT,
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Sequence Information:
+                  - Frame Summaries: ${JSON.stringify(frameSummaries)}
+                  - Sequence Summary: ${JSON.stringify(sequenceSummary)}
+                  
+                  Please answer the following question about this driving sequence: ${content}`,
+              },
+            ],
+          },
+        ],
+        stream: true,
+      };
+
+      // Set only the necessary headers
+      const headers = {
+        'Authorization': `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': window.location.href,
+        'X-Title': 'PCD Chat Assistant',
+      };
+
+      // Make the fetch request
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      buffer += new TextDecoder().decode(value);
+      // Create a new assistant message for streaming
+      let streamingContent = "";
+      const streamingMessageId = `assistant-${Date.now()}`;
+      setChatSession(prev => ({
+        ...prev,
+        messages: prev.messages.filter(msg => !msg.isLoading).concat({
+          id: streamingMessageId,
+          role: MessageRole.ASSISTANT,
+          content: "",
+          timestamp: Date.now(),
+        }),
+      }));
 
-      let index;
-      while ((index = buffer.indexOf('\n')) !== -1) {
-        const line = buffer.slice(0, index);
-        buffer = buffer.slice(index + 1);
+      // Handle the streaming response
+      const reader = response.body.getReader();
+      let buffer = '';
 
-        if (line.startsWith('data: ')) {
-          const jsonStr = line.slice(6);
-          try {
-            const data = JSON.parse(jsonStr);
-            const token = data.choices[0].delta?.content || "";
-            streamingContent += token;
-            setChatSession(prev => ({
-              ...prev,
-              messages: prev.messages.map(msg =>
-                msg.id === streamingMessageId ? { ...msg, content: streamingContent } : msg
-              ),
-            }));
-          } catch (e) {
-            console.error('Error parsing JSON:', e);
+      const processChunk = async ({ done, value }: { done: boolean; value?: Uint8Array }) => {
+        if (done) {
+          setIsProcessing(false);
+          return;
+        }
+
+        buffer += new TextDecoder().decode(value);
+
+        let index;
+        while ((index = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, index);
+          buffer = buffer.slice(index + 1);
+
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6);
+            try {
+              const data = JSON.parse(jsonStr);
+              const token = data.choices[0].delta?.content || "";
+              streamingContent += token;
+              setChatSession(prev => ({
+                ...prev,
+                messages: prev.messages.map(msg =>
+                  msg.id === streamingMessageId ? { ...msg, content: streamingContent } : msg
+                ),
+              }));
+            } catch (e) {
+              console.error('Error parsing JSON:', e);
+            }
           }
         }
-      }
+
+        reader.read().then(processChunk);
+      };
 
       reader.read().then(processChunk);
-    };
+    } catch (error) {
+      console.error("Error calling LLM:", error);
 
-    reader.read().then(processChunk);
-  } catch (error) {
-    console.error("Error calling LLM:", error);
+      const errorMessage: ChatMessage = {
+        id: `assistant-error-${Date.now()}`,
+        role: MessageRole.ASSISTANT,
+        content: "I'm having trouble analyzing this scene right now. Please try again later.",
+        timestamp: Date.now(),
+      };
 
-    const errorMessage: ChatMessage = {
-      id: `assistant-error-${Date.now()}`,
-      role: MessageRole.ASSISTANT,
-      content: "I'm having trouble analyzing this scene right now. Please try again later.",
-      timestamp: Date.now(),
-    };
-
-    setChatSession(prev => ({
-      ...prev,
-      messages: prev.messages.filter(msg => !msg.isLoading).concat(errorMessage),
-    }));
-  } finally {
-    setIsProcessing(false);
-  }
-};
+      setChatSession(prev => ({
+        ...prev,
+        messages: prev.messages.filter(msg => !msg.isLoading).concat(errorMessage),
+      }));
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <PCDContext.Provider value={{ 
-      pcds, 
-      selectedPCD, 
-      selectPCD, 
+      sequences, 
+      selectedSequence, 
+      selectSequence, 
       chatSession, 
       sendMessage,
       isProcessing,
-      openPCDViewer
+      openVideoViewer
     }}>
       {children}
     </PCDContext.Provider>

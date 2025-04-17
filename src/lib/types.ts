@@ -1,13 +1,32 @@
+// Sequence data types
+export type SequenceFrameSummary = {
+  class_percentages: Record<string, number>;
+  ego_motion: {
+    acceleration: number;
+    direction: string;
+    speed: number;
+  };
+  semantic_data: Record<string, any>;
+  instance_data: Record<string, any>;
+};
 
-// PCD (Point Cloud Data) types
-export type PCDItem = {
+export type SequenceSummary = {
+  max_speed: number;
+  min_speed: number;
+  class_presence_timeline: Record<string, number[]>;
+  // Add other fields as needed
+};
+
+// Convert PCD to Sequence
+export type DrivingSequence = {
   id: string;
   name: string;
   thumbnail: string;
   description?: string;
   date?: string;
-  pcdPath?: string;
-  projectionPath?: string;
+  videoPath?: string;
+  frameSummariesPath: string;
+  sequenceSummaryPath: string;
 };
 
 // Chat message types
@@ -29,5 +48,5 @@ export type ChatMessage = {
 export type ChatSession = {
   id: string;
   messages: ChatMessage[];
-  pcd?: PCDItem;
+  sequence?: DrivingSequence;
 };
