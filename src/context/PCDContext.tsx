@@ -9,7 +9,7 @@ const sequenceIds = ["00", "01", "02", "03", "04", "05", "06", "07", "09", "10"]
 const createS3URL = (sceneId, filePath) => {
   // Format scene ID to ensure it's two digits
   const paddedId = sceneId.padStart(2, '0');
-  const url = `https://scene-understanding-sporj.s3.us-east-1.amazonaws.com/scene_${paddedId}/${filePath}`;
+  const url = `https://d2u0hfgsz4s77s.cloudfront.net/scene_${paddedId}/${filePath}`;
   console.log(`Using S3 URL: ${url}`);
   return url;
 };
