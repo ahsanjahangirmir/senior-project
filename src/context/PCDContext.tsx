@@ -17,17 +17,18 @@ const createS3URL = (sceneId, filePath) => {
 const realSequences: DrivingSequence[] = sequenceIds.map((id) => ({
   id,
   name: `Driving Sequence #${id}`,
-  thumbnail: `/assets/data/seq/${id}/thumbnail.png`, // Keep local thumbnail path
+  // Updated thumbnail path to match the S3 format
+  thumbnail: createS3URL(id, "thumbnail.png"),
   description: `Driving sequence capture with various road elements`,
   date: new Date().toISOString().split("T")[0],
-  // Fixed paths to match the exact structure shown in examples
-  videoPath: createS3URL(id, `sequence_${id}_animation.mp4`),
+  // Fixed video path to match the exact structure shown in examples
+  videoPath: createS3URL(id, `${id}.mp4`),
   frameSummariesPath: createS3URL(id, `stats/frame_summaries.json`),
   sequenceSummaryPath: createS3URL(id, `stats/sequence_summary.json`),
-  // Additional paths
-  posesPath: createS3URL(id, "poses.txt"),
-  calibPath: createS3URL(id, "calib.txt"),
-  timesPath: createS3URL(id, "times.txt"),
+  // // Additional paths
+  // posesPath: createS3URL(id, "poses.txt"),
+  // calibPath: createS3URL(id, "calib.txt"),
+  // timesPath: createS3URL(id, "times.txt"),
 }));
 
 const openai = new OpenAI({
@@ -279,7 +280,14 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const videoURL = sequence.videoPath;
       console.log("Opening video URL:", videoURL);
       
-      const videoWindow = window.open("", "_blank");
+      // Define popup window dimensions and features
+      const width = 800;
+      const height = 450;
+      const left = (window.screen.width - width) / 2;
+      const top = (window.screen.height - height) / 2;
+      const features = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no`;
+
+      const videoWindow = window.open("", `video_popup_${sequence.id}`, features);
       if (videoWindow) {
         videoWindow.document.write(`
           <!DOCTYPE html>
@@ -287,15 +295,54 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           <head>
             <title>Driving Sequence ${sequence.id} - Video</title>
             <style>
-              body { margin: 0; background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; }
-              video { max-width: 100%; max-height: 100vh; }
+              body { 
+                margin: 0; 
+                background: #000; 
+                height: 100vh; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                font-family: Arial, sans-serif;
+              }
+              .video-container {
+                position: relative;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              video { 
+                max-width: 100%; 
+                max-height: 100%; 
+                width: auto;
+                height: auto;
+              }
+              .close-button {
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                padding: 8px 16px;
+                background: #333;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+              }
+              .close-button:hover {
+                background: #555;
+              }
             </style>
           </head>
           <body>
-            <video id="videoPlayer" controls autoplay muted>
-              <source src="${videoURL}" type="video/mp4">
-              Your browser does not support the video tag.
-            </video>
+            <div class="video-container">
+              <video id="videoPlayer" controls autoplay muted>
+                <source src="${videoURL}" type="video/mp4">
+                Your browser does not support the video tag.
+              </video>
+              <button class="close-button" onclick="window.close()">Close</button>
+            </div>
             <script>
               const video = document.getElementById("videoPlayer");
               video.addEventListener("error", (e) => {
@@ -311,7 +358,7 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `);
         videoWindow.document.close();
       } else {
-        console.error("Failed to open new window for video playback");
+        console.error("Failed to open popup window for video playback");
         toast.error("Failed to open video player (popup blocked?)");
       }
     } else {
