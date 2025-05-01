@@ -13,7 +13,7 @@ const queryClient = new QueryClient();
 // Wrapper component that includes the VideoModal
 const AppWithVideoModal = () => {
   const { isVideoPlaying, currentVideoURL, closeVideoPlayer, currentVideoTitle } = usePCD();
-  
+
   return (
     <>
       <BrowserRouter>
@@ -24,7 +24,7 @@ const AppWithVideoModal = () => {
         </Routes>
       </BrowserRouter>
       
-      {/* Global Video Modal */}
+      {/* Global Video Modal */}      
       <VideoModal 
         isOpen={isVideoPlaying}
         videoURL={currentVideoURL}
