@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { DrivingSequence } from '@/lib/types';
-import { ArrowUp, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { usePCD } from '@/context/PCDContext';
 
 interface PointCloudViewerProps {
@@ -38,7 +37,10 @@ const PointCloudViewer: React.FC<PointCloudViewerProps> = ({ sequence }) => {
             <p className="text-xs text-muted-foreground mt-1">{sequence.description || "Driving sequence"}</p>
           </div>
           <button 
-            onClick={() => sequence && openVideoViewer(sequence)}
+            onClick={() => {
+              console.log("Opening video for sequence:", sequence.id, sequence.videoPath);
+              sequence && openVideoViewer(sequence);
+            }}
             className="bg-primary text-primary-foreground px-3 py-1 text-xs rounded-full flex items-center"
           >
             <Play size={12} className="mr-1" />

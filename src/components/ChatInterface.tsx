@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { usePCD } from '@/context/PCDContext';
 import ChatMessage from './ChatMessage';
@@ -6,7 +5,13 @@ import { ArrowUp, Play } from 'lucide-react';
 import { Button } from './ui/button';
 
 const ChatInterface: React.FC = () => {
-  const { selectedSequence, chatSession, sendMessage, isProcessing, openVideoViewer } = usePCD();
+  const { 
+    selectedSequence, 
+    chatSession, 
+    sendMessage, 
+    isProcessing, 
+    openVideoViewer
+  } = usePCD();
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
