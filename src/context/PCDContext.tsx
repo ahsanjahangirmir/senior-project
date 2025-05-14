@@ -1,92 +1,108 @@
 import React, { createContext, useContext, useState } from 'react';
-import { DrivingSequence, ChatMessage, MessageRole, ChatSession, SequenceSummary, SequenceFrameSummary } from '@/lib/types';
+import { DrivingSequence, ChatMessage, MessageRole, ChatSession} from '@/lib/types';
 import { toast } from 'sonner';
 
-// Create array of sequence IDs (excluding 08)
-const sequenceIds = ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10'];
+export interface LLMInstrumentationEntry {
+  timestampStart: string;
+  sequenceId: string | null;
+  promptText: string;
+  requestPayloadChars: number;
+  requestPayloadTokensEstimated: number;
+  httpStatusCode: number | null;
+  timeToFirstByteMs: number | null;
+  totalResponseTimeMs: number | null;
+  responseTotalChars: number;
+  responseTotalTokensEstimated: number;
+  tokensPerSecond: number | null;
+  llmCallSuccess: boolean;
+  llmResponseText: string;
+  errorMessage?: string;
+}
 
-// Fixed S3 URL creation
-const createS3URL = (sceneId, filePath) => {
-  // Format scene ID to ensure it's two digits
-  const paddedId = sceneId.padStart(2, '0');
-  const url = `https://d2u0hfgsz4s77s.cloudfront.net/scene_${paddedId}/${filePath}`;
-  console.log(`Using S3 URL: ${url}`);
-  return url;
+const llmInstrumentationData: LLMInstrumentationEntry[] = [];
+
+// Function to log data (optional, you can just push directly)
+const recordLLMInstrumentation = (entry: LLMInstrumentationEntry) => {
+  llmInstrumentationData.push(entry);
+  console.log("LLM Instrumentation Entry:", entry); // For real-time feedback during evaluation
 };
 
-// Create real sequences from available data
+// Function to get all metrics (e.g., to copy from console or save)
+(window as any).getLLMInstrumentationData = () => {
+  console.log(JSON.stringify(llmInstrumentationData, null, 2));
+  return llmInstrumentationData;
+};
+
+const sequenceIds = ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21'];
+
+const getThumbnailPath =        (id: string) => `/src/assets/thumbnails/${id}.png`;
+const getFrameSummariesPath =   (id: string) => `/src/assets/context/${id}/frame_summaries.json`;
+const getSequenceSummaryPath =  (id: string) => `/src/assets/context/${id}/sequence_summary.json`;
+const getVideoPath =            (id: string) => `/src/assets/videos/${id}.mp4`;
+
 const realSequences: DrivingSequence[] = sequenceIds.map((id) => ({
   id,
   name: `Driving Sequence #${id}`,
-  // Updated thumbnail path to match the S3 format
-  thumbnail: createS3URL(id, "thumbnail.png"),
+  thumbnail: getThumbnailPath(id),
   description: `Driving sequence capture with various road elements`,
   date: new Date().toISOString().split("T")[0],
-  // Fixed video path to match the exact structure shown in examples
-  videoPath: createS3URL(id, `${id}.mp4`),
-  frameSummariesPath: createS3URL(id, `stats/frame_summaries.json`),
-  sequenceSummaryPath: createS3URL(id, `stats/sequence_summary.json`),
-  // // Additional paths
-  // posesPath: createS3URL(id, "poses.txt"),
-  // calibPath: createS3URL(id, "calib.txt"),
-  // timesPath: createS3URL(id, "times.txt"),
+  videoPath: getVideoPath(id),
+  frameSummariesPath: getFrameSummariesPath(id),
+  sequenceSummaryPath: getSequenceSummaryPath(id),
 }));
+
+const stripGeminiCitations = (text: string) =>
+  text.replace(/:contentReference\[oaicite:\d+]\{index=\d+}/g, "");
 
 // Master prompt for the LLM
 const MASTER_PROMPT = `
-You are an AI assistant that analyzes and describes road scenes from driving sequence data. 
-You will be provided with sequence summaries and frame-by-frame data, including class percentages, ego vehicle motion, and semantic details. Use this data to understand and analyze the driving scenes thoroughly.
+You are a specialized AI assistant for interpreting and describing 3D driving sequences. Your job is to read the provided **sequence_summary.json** (overall stats) and **frame_summaries.json** (per-frame details) and transform them into human-friendly insights—never dumping raw data.
 
-**Guidelines:**
-- Use the provided sequence data to inform your analysis but don't quote raw values unless specifically asked
-- Provide user-friendly, natural responses that explain the scene context
-- Focus on relevant details that help users understand the driving scenario
-- Format responses using proper markdown for react-markdown rendering
-- Keep responses concise unless asked for more detail
+---
+CONTEXT  
+The sequence represents a single vehicle journey lasting **{{total_duration}} seconds**, covering **{{total_distance}} meters** at an average speed of **{{average_speed}} m/s** :contentReference[oaicite:0]{index=0}:contentReference[oaicite:1]{index=1}. Frame data includes timestamped object counts, ego-motion (speed/acceleration), and semantic class distributions :contentReference[oaicite:2]{index=2}:contentReference[oaicite:3]{index=3}.
 
-**Internal Reference (for analysis only):**
-\`\`\`
-SEMANTIC_KITTI_COLORMAP = {
-    0: [0, 0, 0],          // Unlabeled
-    1: [255, 255, 255],    // Outlier
-    10: [255, 0, 0],       // Car
-    11: [255, 128, 0],     // Bicycle
-    13: [255, 255, 0],     // Bus
-    15: [128, 0, 255],     // Motorcycle
-    16: [255, 0, 255],     // On Rails
-    18: [0, 255, 255],     // Truck
-    20: [128, 128, 0],     // Other vehicle
-    30: [0, 0, 255],       // Person
-    31: [0, 255, 0],       // Bicyclist
-    32: [255, 255, 255],   // Motorcyclist
-    40: [128, 0, 0],       // Road
-    44: [128, 128, 128],   // Parking
-    48: [0, 128, 128],     // Sidewalk
-    49: [128, 0, 128],     // Other ground
-    50: [0, 128, 0],       // Building
-    51: [128, 128, 128],   // Fence
-    52: [0, 0, 128],       // Vegetation
-    53: [128, 0, 0],       // Trunk
-    54: [0, 128, 128],     // Terrain
-    60: [0, 0, 255],       // Pole
-    61: [255, 255, 0],     // Traffic sign
-    70: [128, 128, 0],     // Other man-made
-    71: [0, 255, 255],     // Sky
-    72: [255, 0, 128],     // Water
-    80: [255, 255, 255],   // Ego vehicle
-    81: [255, 255, 255],   // Dynamic
-    99: [128, 128, 128],   // Other
-    252: [255, 0, 0],      // Moving-car
-    253: [255, 128, 0],    // Moving-bicyclist
-    254: [0, 0, 255],      // Moving-person
-    255: [0, 255, 0],      // Moving-motorcyclist
-    256: [255, 0, 255],    // Moving-other-vehicle
-    257: [255, 255, 0]     // Moving-truck
-}
-\`\`\`
+---
+GENERAL GUIDELINES  
+1. **Speak in elapsed time, not frame IDs.**  
+   - E.g. “For the first 4 s, there were five cars around the vehicle; by 0.8 s this dropped to one.”  
+2. **Use the full sequence.**  
+   - Review all frames before answering; don’t fixate on the first few frames.  
+3. **Filter to relevant classes/objects.**  
+   - Only report meaningful categories (e.g. “cars,” “pedestrians,” “traffic signs,” “buildings,” “poles”). Exclude “unknown_72,” “unlabeled,” etc., unless specifically requested.  
+4. **Abstract numbers into narratives.**  
+   - Translate counts and percentages into plain language: “traffic poles line both sides of the road,” “road surface dominates (≈40 % of view).”  
+5. **Avoid raw numeric fields.**  
+   - Don’t mention data keys like "direction: 0.3984". Instead say “the vehicle maintained a steady heading” or “the steering angle barely changed.”  
+6. **Be concise and engaging.**  
+   - Write as if telling a story of the drive: “We cruise down a straight stretch, then glide past a row of poles…”  
+7. **Markdown formatting for react-markdown.**  
+   - Use headings, bullet lists, and italics where helpful—but keep it simple.
+
+---
+EXAMPLE BEHAVIORS  
+
+> **Bad:**  
+> “car_count = 5 at frame 000000, car_count = 4 at frame 000002, direction = 0.1212”  
+>  
+> **Good:**  
+> “In the opening second (0 – 0.2 s), you pass through light traffic—about five vehicles buffer your path. By 0.2 s, traffic thins to four cars as you settle into the main lane.”
+
+---
+TASKS  
+
+- **Count objects:** “How many cars are present?”  
+  - → “There are usually 2–3 cars around you, peaking at five in the first 0.1 s, then settling to one for the middle half of the drive.”  
+- **Identify sharp turns:** “When does the vehicle make a sharp turn?”  
+  - → If no sharp turn occurs over 28 s, answer “The route remains mostly straight—no sharp turns detected.”  
+- **List distinct objects:** “What objects appear?”  
+  - → “You see cars, moving vehicles, traffic signs, poles, sidewalks, and buildings.”
+
+---
+Always ground your answer in the summary data but wrap it in natural, time-based narrative so the user sees **what happened**, **when**, and **why**—not the raw numbers behind it.  
+
 `;
 
-// Types for the context
 type PCDContextType = {
   sequences: DrivingSequence[];
   selectedSequence: DrivingSequence | null;
@@ -101,10 +117,8 @@ type PCDContextType = {
   currentVideoTitle: string | null;
 };
 
-// Create the context
 const PCDContext = createContext<PCDContextType | undefined>(undefined);
 
-// Provider component
 export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sequences] = useState<DrivingSequence[]>(realSequences);
   const [selectedSequence, setSelectedSequence] = useState<DrivingSequence | null>(null);
@@ -222,6 +236,22 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const sendMessage = async (content: string) => {
     if (!content.trim() || !selectedSequence) return;
 
+    const entry: Partial<LLMInstrumentationEntry> = { 
+      timestampStart: new Date().toISOString(),
+      sequenceId: selectedSequence?.id || null,
+      promptText: content,
+      httpStatusCode: null,
+      timeToFirstByteMs: null,
+      totalResponseTimeMs: null,
+      responseTotalChars: 0,
+      responseTotalTokensEstimated: 0,
+      tokensPerSecond: null,
+      llmResponseText: "",
+      llmCallSuccess: false, // Default to false
+    };
+    
+    const tStartRequest = performance.now();
+
     // Add user message
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -252,44 +282,54 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       messages: [...prev.messages, loadingMessage],
     }));
 
+    let tFirstByteReceived: number | null = null;
+
     try {
-      // Get the sequence data
       const frameSummaries = await fetch(selectedSequence.frameSummariesPath).then(res => res.json());
       const sequenceSummary = await fetch(selectedSequence.sequenceSummaryPath).then(res => res.json());
 
-      // Set appropriate types for the message parameters to match OpenAI API requirements
-      const systemMessage = { 
-        role: "system" as const, 
-        content: MASTER_PROMPT 
-      };
-      
-      const userContentMessage = { 
-        role: "user" as const,
-        content: `Sequence Information:
-          - Frame Summaries: ${JSON.stringify(frameSummaries)}
-          - Sequence Summary: ${JSON.stringify(sequenceSummary)}
-          
-          Please answer the following question about this driving sequence: ${content}`
+      const requestBody = {
+        system_instruction: {
+          parts: [{ text: MASTER_PROMPT }],
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: `Sequence Information:
+        - Frame Summaries: ${JSON.stringify(frameSummaries)}
+        - Sequence Summary: ${JSON.stringify(sequenceSummary)}
+        
+        ${content}`,
+              },
+            ],
+          },
+        ],
       };
 
-      // Use fetch directly for streaming to have better control
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY || "OPENROUTER_API_KEY"}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.href,
-          'X-Title': 'PCD Chat Assistant',
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.0-flash-exp:free",
-          messages: [systemMessage, userContentMessage],
-          stream: true,
-        }),
-      });
+      // --- Instrumentation: Request Payload Metrics ---
+      const requestBodyString = JSON.stringify(requestBody);
+      entry.requestPayloadChars = requestBodyString.length;
+      entry.requestPayloadTokensEstimated = Math.ceil(entry.requestPayloadChars / 4); // Heuristic
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${import.meta.env.VITE_GEMINI_API_KEY || "GEMINI_API_KEY"}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: requestBodyString,
+        }
+      );
+
+      entry.httpStatusCode = response.status;
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        entry.errorMessage = `HTTP error ${response.status}: ${errorText}`;
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
       }
 
       // Create a new assistant message for streaming
@@ -310,31 +350,56 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let buffer = '';
 
       const processChunk = async ({ done, value }: { done: boolean; value?: Uint8Array }) => {
+        
+        if (value && tFirstByteReceived === null) {
+          // --- Instrumentation: Time to First Byte ---
+          tFirstByteReceived = performance.now();
+          entry.timeToFirstByteMs = tFirstByteReceived - tStartRequest;
+        }
+        
         if (done) {
+          // --- Instrumentation: Final Metrics on Done ---
+          const tEndResponse = performance.now();
+          entry.totalResponseTimeMs = tEndResponse - tStartRequest;
+          entry.responseTotalTokensEstimated = Math.ceil(entry.responseTotalChars! / 4); // Heuristic
+          entry.llmResponseText = streamingContent;
+          if (entry.timeToFirstByteMs && entry.totalResponseTimeMs && entry.responseTotalTokensEstimated > 0) {
+            const streamingDurationMs = entry.totalResponseTimeMs - entry.timeToFirstByteMs;
+            if (streamingDurationMs > 0) {
+              entry.tokensPerSecond = (entry.responseTotalTokensEstimated / (streamingDurationMs / 1000));
+            }
+          }
+          entry.llmCallSuccess = true;
+          entry.llmResponseText = streamingContent || "";
+          recordLLMInstrumentation(entry as LLMInstrumentationEntry);
           setIsProcessing(false);
           return;
         }
 
-        if (value) {  // Check if value is defined before decoding
+        if (value) {
           buffer += new TextDecoder().decode(value);
-
           let index;
           while ((index = buffer.indexOf('\n')) !== -1) {
             const line = buffer.slice(0, index);
             buffer = buffer.slice(index + 1);
 
             if (line.startsWith('data: ')) {
-              // For "[DONE]" message
-              if (line === 'data: [DONE]') {
-                setIsProcessing(false);
+              if (line === 'data: [DONE]') { // Should be caught by `done` flag above, but as a safeguard
+                setIsProcessing(false); // Might already be set by `done` path
+                // Consider if final metrics need to be recorded here if `done` wasn't hit first
                 return;
               }
-
               const jsonStr = line.slice(6);
               try {
                 const data = JSON.parse(jsonStr);
-                if (data?.choices && data.choices[0]?.delta?.content) {
-                  const token = data.choices[0].delta.content;
+                if (data?.candidates &&
+                  data.candidates[0]?.content?.parts &&
+                  data.candidates[0].content.parts[0]?.text) {
+                  const raw = data.candidates[0].content.parts[0].text || "";
+                  // --- Instrumentation: Accumulate Response Chars ---
+                  entry.responseTotalChars! += raw.length;
+                  // --- Instrumentation: END Accumulate ---
+                  const token = stripGeminiCitations(raw);
                   streamingContent += token;
                   setChatSession(prev => ({
                     ...prev,
@@ -344,25 +409,49 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   }));
                 }
               } catch (e) {
-                console.error('Error parsing JSON:', e);
+                console.error('Error parsing JSON chunk:', e, "Chunk:", jsonStr);
               }
             }
           }
         }
-
-        // Continue reading
         reader.read().then(processChunk).catch(err => {
-          console.error("Error in stream processing:", err);
+          console.error("Error in stream processing (read continuation):", err);
+          // --- Instrumentation: Error during stream ---
+          const tEndResponse = performance.now();
+          entry.totalResponseTimeMs = tEndResponse - tStartRequest;
+          entry.errorMessage = err.message || 'Error in stream processing';
+          entry.llmCallSuccess = false;
+          entry.llmResponseText = streamingContent || "";
+          recordLLMInstrumentation(entry as LLMInstrumentationEntry);
+          // --- Instrumentation: END Error ---
           setIsProcessing(false);
         });
       };
 
       reader.read().then(processChunk).catch(err => {
-        console.error("Error in initial read:", err);
+        console.error("Error in initial stream read:", err);
+         // --- Instrumentation: Error on initial read ---
+        const tEndResponse = performance.now();
+        entry.totalResponseTimeMs = tEndResponse - tStartRequest;
+        entry.errorMessage = err.message || 'Error in initial stream read';
+        entry.llmCallSuccess = false;
+        entry.llmResponseText = streamingContent || "";
+        recordLLMInstrumentation(entry as LLMInstrumentationEntry);
+        // --- Instrumentation: END Error ---
         setIsProcessing(false);
       });
-    } catch (error) {
-      console.error("Error calling LLM:", error);
+    } catch (error: any) {
+      console.error("Error calling LLM or processing its response:", error);
+      const tEndResponse = performance.now(); // Time of catching the error
+      // --- Instrumentation: Catch Block Error ---
+      entry.totalResponseTimeMs = tEndResponse - tStartRequest;
+      entry.errorMessage = error.message || 'Generic error in sendMessage';
+      if (error.response && error.response.status) { // If error object has response details
+          entry.httpStatusCode = error.response.status;
+      }
+      entry.llmCallSuccess = false;
+      recordLLMInstrumentation(entry as LLMInstrumentationEntry);
+      // --- Instrumentation: END Catch Block Error ---
 
       const errorMessage: ChatMessage = {
         id: `assistant-error-${Date.now()}`,
@@ -370,12 +459,10 @@ export const PCDProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         content: "I'm having trouble analyzing this scene right now. Please try again later.",
         timestamp: Date.now(),
       };
-
       setChatSession(prev => ({
         ...prev,
         messages: prev.messages.filter(msg => !msg.isLoading).concat(errorMessage),
       }));
-      
       setIsProcessing(false);
     }
   };

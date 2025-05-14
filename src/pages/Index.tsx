@@ -8,9 +8,9 @@ const Index: React.FC = () => {
       {/* Header */}
       <header className="p-4 border-b border-border glass">
         <div className="container mx-auto flex items-center justify-between">
-          <h1 className="text-xl font-medium">PCD Chat Assistant</h1>
+          <h1 className="text-xl font-medium">LLM Guided 3D Road Scene Analysis</h1>
           <div className="text-sm text-muted-foreground">
-            Point Cloud Analysis System
+            Developed by Ahsan Mir, Aazen Saleem, and Abdulhaseeb Khan
           </div>
         </div>
       </header>
