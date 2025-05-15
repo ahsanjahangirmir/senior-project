@@ -9,8 +9,8 @@ export const Gallery: React.FC = () => {
   return (
     <div className="h-full flex flex-col animate-fade-in">
       <div className="p-4 border-b border-border">
-        <h2 className="text-lg font-medium">Driving Sequences</h2>
-        <p className="text-sm text-muted-foreground">Select a sequence to analyze</p>
+        <h2 className="text-lg font-medium">Driving Sequences Gallery</h2>
+        <p className="text-sm text-muted-foreground">Select a sequence to analyze from the SemanticKITTI dataset. (00-10 are train sequences which also contain instance information. 11-21 are test sequences that do not contain instance information.) Some sequences have been omitted at the moment due to operational constraints.</p>
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

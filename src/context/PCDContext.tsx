@@ -33,12 +33,13 @@ const recordLLMInstrumentation = (entry: LLMInstrumentationEntry) => {
   return llmInstrumentationData;
 };
 
-const sequenceIds = ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21'];
+// const sequenceIds = ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21'];
+const sequenceIds = ['01', '03', '04', '06', '07', '09', '10', '11', '12', '14', '16', '17', '18', '20'];
 
-const getThumbnailPath =        (id: string) => `/src/assets/thumbnails/${id}.png`;
-const getFrameSummariesPath =   (id: string) => `/src/assets/context/${id}/frame_summaries.json`;
-const getSequenceSummaryPath =  (id: string) => `/src/assets/context/${id}/sequence_summary.json`;
-const getVideoPath =            (id: string) => `/src/assets/videos/${id}.mp4`;
+const getThumbnailPath =        (id: string) => `/assets/thumbnails/${id}.png`;
+const getFrameSummariesPath =   (id: string) => `/assets/context/${id}/frame_summaries.json`;
+const getSequenceSummaryPath =  (id: string) => `/assets/context/${id}/sequence_summary.json`;
+const getVideoPath =            (id: string) => `/assets/videos/${id}.mp4`;
 
 const realSequences: DrivingSequence[] = sequenceIds.map((id) => ({
   id,
