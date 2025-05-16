@@ -1,6 +1,6 @@
-# Welcome to My Senior Project
+# From LiDAR to Language: LLM-Driven Semantic & Motion-Aware 3D Driving Scene Analysis Using Segmented Point Clouds
 
-## Project info
+## Welcome to My Senior Project at the Lahore University of Management Sciences
 
 ## How can I edit this code?
 
